@@ -1,5 +1,10 @@
 # Project Overview
 
+This is a project to classify waste into 12 different categories. The user uploads a picture with one or more articles of waste, and an annotated version of the image is displayed, with the different articles highlighted and classified into their categories.
+
+The user must also select the location where the picture was taken so that our website displays the nearest waste collection and recycling centres, encouraging them to dispose of their waste responsibly.
+
+
 # Setup Instructions
 
 ## Step 1:
