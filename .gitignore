@@ -1,0 +1,160 @@
+# -*- gitignore for Waste-Classification project -*-
+
+# Python bytecode / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+pip-wheel-metadata/
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+
+# Jupyter / notebooks
+.ipynb_checkpoints
+*.ipynb_checkpoints
+jupyter_runtime/
+jupyter_cache/
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Type checkers / caches
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+Icon?
+.Spotlight-V100/
+.Trashes/
+ehthumbs.db
+
+# OneDrive / temp Office files
+~$*
+*.lnk
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite3
+*.db
+*.db-journal
+
+# Sensitive / env files
+.env
+.env.*
+secrets.*
+credentials.json
+client_secrets.json
+*.pem
+*.key
+
+# Machine learning artifacts / large binaries
+models/
+checkpoints/
+checkpoints_*/
+logs/
+runs/
+tensorboard/
+tb_logs/
+artifacts/
+outputs/
+results/
+predictions/
+
+# Backend uploads and generated images
+backend/uploads/
+backend/static/
+uploads/
+static/
+
+# Common model file formats
+*.ckpt
+*.pth
+*.pt
+*.h5
+*.hdf5
+*.t7
+*.onnx
+*.joblib
+*.pkl
+*.sav
+
+# Dataset / data directories (adjust if you keep small sample data in repo)
+data/
+datasets/
+raw_data/
+processed_data/
+*.csv
+*.tsv
+*.parquet
+*.npz
+*.npy
+
+# Build / packaging leftovers
+*.egg
+*.egg-info/
+dist/
+build/
+pip-wheel-metadata/
+
+# Docker
+docker-compose.override.yml
+
+# Notebook exports / reports
+*.html
+*.pdf
+
+# Misc
+*.tmp
+*.bak
+*.swp
