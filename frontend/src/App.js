@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import ImageUploader from "./components/ImageUploader";
 import MapWithAutocomplete from "./components/MapWithAutocomplete";
+import "./App.css";
 
 function App() {
   const [results, setResults] = useState(null);
@@ -8,189 +9,268 @@ function App() {
 
   // Modern color and layout styles
   const containerStyle = {
-    padding: "30px",
-    maxWidth: "980px",
-    margin: "36px auto",
-    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-    background: "linear-gradient(90deg,#e8f7fc 0%,#fafdfe 84%)",
-    borderRadius: "18px",
-    boxShadow: "0 0 24px rgba(60,183,217,0.14)"
+    padding: "40px 20px",
+    maxWidth: "1200px",
+    margin: "0 auto",
+    minHeight: "100vh",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
   };
 
   const sectionTitleStyle = {
-    color: "#226ba0",
-    marginBottom: "15px",
-    borderBottom: "2px solid #8ee4f7",
-    paddingBottom: "7px",
-    letterSpacing: "0.5px",
-    fontSize: "1.25em",
-    fontWeight: 600
-  };
-
-  const listStyle = {
-    listStyleType: "none",
-    padding: 0,
-    marginTop: "7px",
-    marginBottom: 0
+    color: "#1a202c",
+    marginBottom: "20px",
+    fontSize: "1.5em",
+    fontWeight: 700,
+    letterSpacing: "-0.025em",
+    paddingBottom: "12px",
+    borderBottom: "3px solid",
+    borderImage: "linear-gradient(90deg, #667eea, #764ba2) 1"
   };
 
   const listItemStyle = {
-    marginBottom: "11px",
-    padding: "15px",
-    background: "linear-gradient(90deg,#baf1ef 0%,#d8fff6 100%)",
-    borderRadius: "9px",
+    marginBottom: "12px",
+    padding: "18px 24px",
+    background: "#ffffff",
+    borderRadius: "12px",
     fontSize: "1em",
-    boxShadow: "0 1px 2px rgba(60,183,217,0.06)"
-  };
-
-  const buttonStyle = {
-    marginTop: "32px",
-    padding: "16px 42px",
-    fontSize: "17px",
-    background: "linear-gradient(90deg,#7fd8dd 0%,#67bee3 100%)",
-    color: "#fff",
     border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    boxShadow: "0 2px 8px rgba(60,183,217,0.13)",
-    fontWeight: 600,
-    transition: "background 0.18s"
+    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+    transition: "all 0.3s ease",
+    cursor: "pointer"
   };
-
-  const buttonHoverStyle = { background: "#45b3c7" };
 
   // Main submit action (if you want to perform more with map location)
   const handleLocationChange = (loc) => setLocation(loc);
-  const handleSubmit = () => {
-    if (location) {
-      alert(`Location: lat ${location.lat}, lng ${location.lng}`);
-    } else {
-      alert("Please select a location first");
-    }
-  };
 
   // Waste composition as styled table
-  const CompositionTable = ({ composition }) => (
-    <table style={{
-      width: "100%",
-      borderCollapse: "collapse",
-      background: "#e8f7fc",
-      borderRadius: "8px",
-      boxShadow: "0 1px 8px rgba(60,183,217,0.09)",
-      marginTop: "4px"
-    }}>
-      <thead>
-        <tr>
-          <th style={{
-            padding: "11px",
-            background: "#32b6e0",
-            color: "#fff",
-            fontWeight: 600,
-            fontSize: "1em",
-            borderTopLeftRadius: "8px"
-          }}>Category</th>
-          <th style={{
-            padding: "11px",
-            background: "#32b6e0",
-            color: "#fff",
-            fontWeight: 600,
-            fontSize: "1em",
-            borderTopRightRadius: "8px"
-          }}>Composition (%)</th>
-        </tr>
-      </thead>
-      <tbody>
-        {Object.entries(composition).map(([category, percent]) => (
-          <tr key={category} style={{ background: "#d2f5ff" }}>
-            <td style={{ padding: "12px", borderBottom: "1px solid #c7e5f0" }}>{category}</td>
-            <td style={{ padding: "12px", borderBottom: "1px solid #c7e5f0" }}>{percent}%</td>
-          </tr>
+  const CompositionTable = ({ composition }) => {
+    const maxPercent = Math.max(...Object.values(composition));
+    return (
+      <div style={{ marginTop: "20px" }}>
+        {Object.entries(composition).map(([category, percent], idx) => (
+          <div
+            key={category}
+            style={{
+              marginBottom: "20px",
+              animation: `slideIn 0.5s ease ${idx * 0.1}s backwards`
+            }}
+          >
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginBottom: "10px",
+              alignItems: "center"
+            }}>
+              <span style={{
+                fontWeight: 700,
+                fontSize: "1.05em",
+                color: "#1a202c",
+                textTransform: "capitalize"
+              }}>{category}</span>
+              <span style={{
+                fontWeight: 700,
+                fontSize: "1.15em",
+                color: "#667eea"
+              }}>{percent}%</span>
+            </div>
+            <div style={{
+              height: "20px",
+              background: "#f0f4ff",
+              borderRadius: "10px",
+              overflow: "hidden",
+              boxShadow: "inset 0 2px 4px rgba(0,0,0,0.06)"
+            }}>
+              <div style={{
+                height: "100%",
+                width: `${percent}%`,
+                background: percent === maxPercent 
+                  ? "linear-gradient(90deg, #f093fb 0%, #f5576c 100%)"
+                  : "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
+                borderRadius: "10px",
+                transition: "width 1s ease",
+                boxShadow: "0 2px 8px rgba(102, 126, 234, 0.4)"
+              }} />
+            </div>
+          </div>
         ))}
-      </tbody>
-    </table>
-  );
+      </div>
+    );
+  };
 
   return (
     <div style={containerStyle}>
-      <h1 style={{
-        textAlign: "center",
-        color: "#1881b2",
-        letterSpacing: "1px",
-        fontWeight: 700,
-        fontSize: "2.1em",
-        marginBottom: "26px"
-      }}>Waste Classification</h1>
-
-      {/* Image Upload component handles file, location, results */}
-      <ImageUploader location={location} onResults={setResults} />
-
-      {/* Annotated waste image preview */}
-      {results?.annotated_image_url && (
-        <div style={{ marginTop: "38px" }}>
-          <h3 style={sectionTitleStyle}>Annotated Waste Image</h3>
-          <img
-            src={results.annotated_image_url}
-            alt="Annotated upload"
-            style={{
-              maxWidth: "100%",
-              borderRadius: "11px",
-              boxShadow: "0 2px 18px rgba(24,129,178,0.13)"
-            }}
-          />
+      <div style={{
+        background: "#ffffff",
+        borderRadius: "20px",
+        padding: "40px",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+        marginBottom: "30px"
+      }}>
+        <div style={{
+          textAlign: "center",
+          marginBottom: "40px"
+        }}>
+          <div style={{
+            fontSize: "4em",
+            marginBottom: "16px",
+            filter: "drop-shadow(0 4px 8px rgba(102,126,234,0.3))"
+          }}>♻️</div>
+          <h1 style={{
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+            fontWeight: 800,
+            fontSize: "2.75em",
+            margin: "0 0 12px 0",
+            letterSpacing: "-0.025em"
+          }}>Waste Classification</h1>
+          <p style={{
+            color: "#718096",
+            fontSize: "1.15em",
+            margin: 0,
+            fontWeight: 500
+          }}>AI-Powered Waste Detection & Recycling Center Locator</p>
         </div>
-      )}
 
-      {/* Composition percentages as a colored table */}
-      {results?.composition && Object.keys(results.composition).length > 0 && (
-        <div style={{ marginTop: "28px" }}>
-          <h3 style={sectionTitleStyle}>Waste Composition (%)</h3>
-          <CompositionTable composition={results.composition} />
-        </div>
-      )}
+        {/* Image Upload component handles file, location, results */}
+        <ImageUploader location={location} onResults={setResults} />
 
-      {/* Raw category counts */}
-      {results?.classifications && results.classifications.length > 0 && (
-        <div style={{ marginTop: "28px" }}>
-          <h3 style={sectionTitleStyle}>Classified Waste Counts</h3>
-          <ul style={listStyle}>
-            {results.classifications.map((cat) => (
-              <li key={cat.name} style={listItemStyle}>
-                <strong style={{ color: "#1a8890" }}>{cat.name}</strong>: {cat.count}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        {/* Composition percentages as a colored table */}
+        {results?.composition && Object.keys(results.composition).length > 0 && (
+          <div style={{ marginTop: "40px" }} className="fade-in">
+            <h3 style={sectionTitleStyle}>📊 Waste Composition (%)</h3>
+            <CompositionTable composition={results.composition} />
+          </div>
+        )}
+
+        {/* Raw category counts */}
+        {results?.classifications && results.classifications.length > 0 && (
+          <div style={{ marginTop: "40px" }} className="fade-in">
+            <h3 style={sectionTitleStyle}>🎯 Classification Details</h3>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              gap: "16px"
+            }}>
+              {results.classifications.map((cat, idx) => (
+                <div
+                  key={cat.name}
+                  style={{
+                    ...listItemStyle,
+                    animation: `slideIn 0.5s ease ${idx * 0.1}s backwards`
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = "translateY(-4px)";
+                    e.currentTarget.style.boxShadow = "0 8px 20px rgba(102,126,234,0.2)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
+                  }}
+                >
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                    <span style={{ 
+                      color: "#1a202c",
+                      fontWeight: 600,
+                      fontSize: "1.05em",
+                      textTransform: "capitalize"
+                    }}>{cat.name}</span>
+                    <span style={{
+                      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                      color: "white",
+                      padding: "6px 16px",
+                      borderRadius: "20px",
+                      fontWeight: 700,
+                      fontSize: "1em",
+                      boxShadow: "0 4px 12px rgba(102,126,234,0.3)"
+                    }}>{cat.count}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>
 
       {/* Map selector and nearest centers */}
-      <div style={{ marginTop: "35px" }}>
-        <h3 style={sectionTitleStyle}>Select Location</h3>
+      <div style={{
+        background: "#ffffff",
+        borderRadius: "20px",
+        padding: "40px",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+        marginTop: "30px"
+      }}>
+        <h3 style={sectionTitleStyle}>🗺️ Select Location</h3>
+        <p style={{
+          color: "#718096",
+          marginBottom: "24px",
+          fontSize: "1.05em"
+        }}>Choose your location to find nearby recycling centers</p>
         <MapWithAutocomplete
           onLocationChange={handleLocationChange}
           location={location}
         />
       </div>
 
-      <button
-        style={buttonStyle}
-        onClick={handleSubmit}
-        onMouseOver={e => (e.target.style.background = buttonHoverStyle.background)}
-        onMouseOut={e => (e.target.style.background = buttonStyle.background)}
-      >
-        Submit
-      </button>
-
       {/* Nearest recycling centers listed */}
-      {location && results?.nearest_centers && (
-        <div style={{ marginTop: "38px" }}>
-          <h3 style={sectionTitleStyle}>Nearest Recycling Centers</h3>
-          <ul style={listStyle}>
-            {results.nearest_centers.map((center) => (
-              <li key={center.name} style={listItemStyle}>
-                {center.name} <span style={{ color: "#2e7fa4" }}>({center.distance} km)</span>
-              </li>
+      {location && results?.nearest_centers && results.nearest_centers.length > 0 && (
+        <div style={{
+          background: "#ffffff",
+          borderRadius: "20px",
+          padding: "40px",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+          marginTop: "30px"
+        }} className="fade-in">
+          <h3 style={sectionTitleStyle}>📍 Nearest Recycling Centers</h3>
+          <div style={{ marginTop: "20px" }}>
+            {results.nearest_centers.map((center, idx) => (
+              <div
+                key={center.name}
+                style={{
+                  ...listItemStyle,
+                  marginBottom: "16px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  animation: `slideIn 0.5s ease ${idx * 0.15}s backwards`
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = "translateX(6px)";
+                  e.currentTarget.style.boxShadow = "0 8px 20px rgba(245,87,108,0.2)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = "translateX(0)";
+                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "1.1em", color: "#1a202c", marginBottom: "6px" }}>
+                    {center.name}
+                  </div>
+                  <div style={{ color: "#718096", fontSize: "0.95em" }}>Click to view on map</div>
+                </div>
+                <div style={{
+                  background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+                  color: "white",
+                  padding: "8px 18px",
+                  borderRadius: "25px",
+                  fontWeight: 700,
+                  fontSize: "1em",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 4px 12px rgba(245,87,108,0.3)"
+                }}>
+                  {center.distance} km
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
     </div>
