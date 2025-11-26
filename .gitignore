@@ -99,23 +99,23 @@ client_secrets.json
 *.key
 
 # Machine learning artifacts / large binaries
-models/
-checkpoints/
-checkpoints_*/
-logs/
-runs/
-tensorboard/
-tb_logs/
-artifacts/
-outputs/
-results/
-predictions/
+#models/
+#checkpoints/
+#checkpoints_*/
+#logs/
+#runs/
+#tensorboard/
+#tb_logs/
+#artifacts/
+#outputs/
+#results/
+#predictions/
 
 # Backend uploads and generated images
-backend/uploads/
-backend/static/
-uploads/
-static/
+# backend/uploads/
+# backend/static/
+# uploads/
+# static/
 
 # Common model file formats
 *.ckpt
@@ -130,10 +130,10 @@ static/
 *.sav
 
 # Dataset / data directories (adjust if you keep small sample data in repo)
-data/
-datasets/
-raw_data/
-processed_data/
+# data/
+# datasets/
+# raw_data/
+# processed_data/
 *.csv
 *.tsv
 *.parquet
