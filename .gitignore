@@ -134,11 +134,12 @@ client_secrets.json
 # datasets/
 # raw_data/
 # processed_data/
-*.csv
-*.tsv
-*.parquet
-*.npz
-*.npy
+# Note: Images and model files are tracked via Git LFS
+# *.csv
+# *.tsv
+# *.parquet
+# *.npz
+# *.npy
 
 # Build / packaging leftovers
 *.egg
