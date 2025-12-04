@@ -10,14 +10,10 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
@@ -26,7 +22,7 @@ var/
 *.egg
 pip-wheel-metadata/
 
-# Virtual environments
+# Virtual environments - Users create their own locally
 venv/
 env/
 .venv/
@@ -98,54 +94,34 @@ client_secrets.json
 *.pem
 *.key
 
-# Machine learning artifacts / large binaries
-#models/
-#checkpoints/
-#checkpoints_*/
-#logs/
-#runs/
-#tensorboard/
-#tb_logs/
-#artifacts/
-#outputs/
-#results/
-#predictions/
+# ========================================
+# ONLY EXCLUDE: DATASET & CONFUSION MATRIX IMAGES
+# ========================================
 
-# Backend uploads and generated images
-# backend/uploads/
-# backend/static/
-# uploads/
-# static/
+# Dataset directories (DO NOT PUSH)
+data/
+datasets/
+raw_data/
+processed_data/
+garbage_classification/
+train/
+val/
+test/
 
-# Common model file formats
-*.ckpt
-*.pth
-*.pt
-*.h5
-*.hdf5
-*.t7
-*.onnx
-*.joblib
-*.pkl
-*.sav
+# Confusion matrix images only (DO NOT PUSH)
+evaluation_results_consolidated/*.png
+evaluation_results_consolidated/*.jpg
+evaluation_results_consolidated/*.jpeg
 
-# Dataset / data directories (adjust if you keep small sample data in repo)
-# data/
-# datasets/
-# raw_data/
-# processed_data/
-# Note: Images and model files are tracked via Git LFS
-# *.csv
-# *.tsv
-# *.parquet
-# *.npz
-# *.npy
-
-# Build / packaging leftovers
-*.egg
-*.egg-info/
-dist/
-build/
+# ========================================
+# EVERYTHING ELSE WILL BE PUSHED
+# ========================================
+# Models - KEPT
+# Backend - KEPT  
+# Frontend - KEPT
+# venv/ - kept (users should create their own)
+# node_modules - kept (users should npm install)
+# All Python source code - KEPT
 pip-wheel-metadata/
 
 # Docker
