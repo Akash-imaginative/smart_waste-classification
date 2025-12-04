@@ -1,0 +1,48 @@
+================================================================================
+DENSENET121 MODEL - INDEPENDENT TEST SET EVALUATION
+================================================================================
+
+Model: models\checkpoints\highaccuracy_86.63_epoch29.keras
+Test Directory: C:\Users\Lenovo\OneDrive\Desktop\test
+Total Images: 1200
+
+OVERALL ACCURACY: 80.25%
+================================================================================
+
+CLASSIFICATION REPORT:
+--------------------------------------------------------------------------------
+              precision    recall  f1-score   support
+
+     battery     0.9802    0.9900    0.9851       100
+  biological     0.9896    0.9500    0.9694       100
+ brown-glass     0.9900    0.9900    0.9900       100
+   cardboard     0.5808    0.9700    0.7266       100
+     clothes     0.0000    0.0000    0.0000       100
+ green-glass     1.0000    1.0000    1.0000       100
+       metal     0.8596    0.9800    0.9159       100
+       paper     1.0000    0.0200    0.0392       100
+     plastic     0.9010    0.9100    0.9055       100
+       shoes     1.0000    1.0000    1.0000       100
+       trash     0.4019    0.8600    0.5478       100
+ white-glass     0.9143    0.9600    0.9366       100
+
+    accuracy                         0.8025      1200
+   macro avg     0.8015    0.8025    0.7513      1200
+weighted avg     0.8015    0.8025    0.7513      1200
+
+
+================================================================================
+PER-CLASS ACCURACY:
+================================================================================
+battery        : 99.00%
+biological     : 95.00%
+brown-glass    : 99.00%
+cardboard      : 97.00%
+clothes        : 0.00%
+green-glass    : 100.00%
+metal          : 98.00%
+paper          : 2.00%
+plastic        : 91.00%
+shoes          : 100.00%
+trash          : 86.00%
+white-glass    : 96.00%

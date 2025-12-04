@@ -253,7 +253,6 @@ function ImageUploader({ onResults, location, onImageSelect }) {
               </>
             ) : (
               <>
-                <span>🚀</span>
                 Classify Waste
               </>
             )}
@@ -367,7 +366,7 @@ function ImageUploader({ onResults, location, onImageSelect }) {
                 alignItems: 'center',
                 gap: '8px'
               }}>
-                <span>✨</span> AI Classified Result
+                	Result
               </h4>
               <div style={{
                 background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',

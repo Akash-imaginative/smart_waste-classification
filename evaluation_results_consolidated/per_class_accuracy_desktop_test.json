@@ -1,0 +1,19 @@
+{
+  "overall_accuracy": 0.8025,
+  "per_class_accuracy": {
+    "battery": 0.99,
+    "biological": 0.95,
+    "brown-glass": 0.99,
+    "cardboard": 0.97,
+    "clothes": 0.0,
+    "green-glass": 1.0,
+    "metal": 0.98,
+    "paper": 0.02,
+    "plastic": 0.91,
+    "shoes": 1.0,
+    "trash": 0.86,
+    "white-glass": 0.96
+  },
+  "total_images": 1200,
+  "test_directory": "C:\\Users\\Lenovo\\OneDrive\\Desktop\\test"
+}

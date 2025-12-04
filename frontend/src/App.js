@@ -6,6 +6,9 @@ import "./App.css";
 function App() {
   const [results, setResults] = useState(null);
   const [location, setLocation] = useState(null);
+  const [loadingCenters, setLoadingCenters] = useState(false);
+  const [centersError, setCentersError] = useState(null);
+ 
 
   // Modern color and layout styles
   const containerStyle = {
@@ -43,19 +46,57 @@ function App() {
   // Main submit action (if you want to perform more with map location)
   const handleLocationChange = (loc) => setLocation(loc);
 
+  // Function to find recycling centers independently
+  const handleFindCenters = async () => {
+    if (!location) {
+      setCentersError('Please select a location first');
+      return;
+    }
+
+    setLoadingCenters(true);
+    setCentersError(null);
+
+    try {
+      const backendUrl = process.env.REACT_APP_BACKEND_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/api/find-centers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          latitude: location.lat,
+          longitude: location.lng
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch recycling centers');
+      }
+
+      const data = await response.json();
+      setResults(prev => ({
+        ...prev,
+        nearest_centers: data.nearest_centers
+      }));
+    } catch (error) {
+      setCentersError('Error finding recycling centers. Please try again.');
+      console.error(error);
+    } finally {
+      setLoadingCenters(false);
+    }
+  };
+
   // Waste composition as styled table
   const CompositionTable = ({ composition }) => {
-    const maxPercent = Math.max(...Object.values(composition));
-    return (
-      <div style={{ marginTop: "20px" }}>
-        {Object.entries(composition).map(([category, percent], idx) => (
-          <div
-            key={category}
-            style={{
-              marginBottom: "20px",
-              animation: `slideIn 0.5s ease ${idx * 0.1}s backwards`
-            }}
-          >
+  const maxPercent = Math.max(...Object.values(composition));
+  return (
+    <div style={{ marginTop: "20px" }}>
+      {Object.entries(composition).map(([category, percent], idx) => (
+        <div
+          key={`${category}-${idx}`}
+          style={{
+            marginBottom: "20px",
+            animation: `slideIn 0.5s ease ${idx * 0.1}s backwards`
+          }}
+        >
             <div style={{
               display: "flex",
               justifyContent: "space-between",
@@ -125,13 +166,13 @@ function App() {
             fontSize: "2.75em",
             margin: "0 0 12px 0",
             letterSpacing: "-0.025em"
-          }}>Waste Classification</h1>
+          }}>Ecoscan</h1>
           <p style={{
             color: "#718096",
             fontSize: "1.15em",
             margin: 0,
             fontWeight: 500
-          }}>AI-Powered Waste Detection & Recycling Center Locator</p>
+          }}>Smart Waste Classification & Recycling Center Locator</p>
         </div>
 
         {/* Image Upload component handles file, location, results */}
@@ -156,7 +197,7 @@ function App() {
             }}>
               {results.classifications.map((cat, idx) => (
                 <div
-                  key={cat.name}
+                  key={`${cat.name}-${idx}`}
                   style={{
                     ...listItemStyle,
                     animation: `slideIn 0.5s ease ${idx * 0.1}s backwards`
@@ -216,63 +257,162 @@ function App() {
         <MapWithAutocomplete
           onLocationChange={handleLocationChange}
           location={location}
+          onConfirmLocation={handleLocationChange}
         />
+        
+        {/* Find Centers Button */}
+        {location && (
+          <div style={{ marginTop: '24px', textAlign: 'center' }}>
+            <button
+              onClick={handleFindCenters}
+              disabled={loadingCenters}
+              style={{
+                padding: '14px 32px',
+                fontSize: '1.05em',
+                background: loadingCenters ? '#e2e8f0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: loadingCenters ? 'not-allowed' : 'pointer',
+                fontWeight: 700,
+                transition: 'all 0.3s ease',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '10px',
+                boxShadow: loadingCenters ? 'none' : '0 4px 15px rgba(102,126,234,0.4)'
+              }}
+              onMouseOver={(e) => {
+                if (!loadingCenters) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(102,126,234,0.6)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!loadingCenters) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(102,126,234,0.4)';
+                }
+              }}
+            >
+              {loadingCenters ? (
+                <>
+                  <div className="spinner" style={{ margin: 0, width: '16px', height: '16px', borderWidth: '2px' }}></div>
+                  Searching...
+                </>
+              ) : (
+                <>
+                  <span>📍</span>
+                  Find Recycling Centers
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {centersError && (
+          <div style={{
+            marginTop: '16px',
+            padding: '14px 20px',
+            background: '#fef2f2',
+            borderRadius: '8px',
+            color: '#991b1b',
+            fontWeight: 500,
+            fontSize: '0.95em',
+            border: '1px solid #fecaca',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <span style={{ fontSize: '1.1em' }}>⚠️</span>
+            {centersError}
+          </div>
+        )}
       </div>
 
-      {/* Nearest recycling centers listed */}
       {location && results?.nearest_centers && results.nearest_centers.length > 0 && (
-        <div style={{
-          background: "#ffffff",
-          borderRadius: "20px",
-          padding: "40px",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
-          marginTop: "30px"
-        }} className="fade-in">
-          <h3 style={sectionTitleStyle}>📍 Nearest Recycling Centers</h3>
-          <div style={{ marginTop: "20px" }}>
-            {results.nearest_centers.map((center, idx) => (
-              <div
-                key={center.name}
-                style={{
-                  ...listItemStyle,
-                  marginBottom: "16px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  animation: `slideIn 0.5s ease ${idx * 0.15}s backwards`
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = "translateX(6px)";
-                  e.currentTarget.style.boxShadow = "0 8px 20px rgba(245,87,108,0.2)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = "translateX(0)";
-                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: "1.1em", color: "#1a202c", marginBottom: "6px" }}>
-                    {center.name}
-                  </div>
-                  <div style={{ color: "#718096", fontSize: "0.95em" }}>Click to view on map</div>
-                </div>
-                <div style={{
-                  background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-                  color: "white",
-                  padding: "8px 18px",
-                  borderRadius: "25px",
-                  fontWeight: 700,
-                  fontSize: "1em",
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 4px 12px rgba(245,87,108,0.3)"
-                }}>
-                  {center.distance} km
-                </div>
+  <div style={{
+    background: "#ffffff",
+    borderRadius: "20px",
+    padding: "40px",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+    marginTop: "30px"
+  }} className="fade-in">
+    <h3 style={sectionTitleStyle}>📍 Nearest Recycling Centers</h3>
+    <div style={{ marginTop: "20px" }}>
+      {results.nearest_centers.map((center, idx) => (
+        <div 
+          key={`${center.name}-${idx}`}
+          style={{
+            ...listItemStyle,
+            marginBottom: "20px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: "20px",
+            animation: `slideIn 0.5s ease ${idx * 0.15}s backwards`
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = "translateX(6px)";
+            e.currentTarget.style.boxShadow = "0 8px 20px rgba(66,153,225,0.2)";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = "translateX(0)";
+            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0, paddingRight: "20px" }}>
+            {/* Center Name */}
+            <div style={{ 
+              fontWeight: 700, 
+              fontSize: "1.15em", 
+              color: "#1a202c", 
+              marginBottom: "10px",
+              lineHeight: "1.3"
+            }}>
+              {center.name}
+            </div>
+            
+            {/* 🆕 FULL NOMINATIM ADDRESS */}
+            {center.full_address && (
+              <div style={{
+                fontSize: "0.92em",
+                color: "#2d3748",
+                background: "linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)",
+                padding: "12px 16px",
+                borderRadius: "12px",
+                borderLeft: "4px solid #4299e1",
+                lineHeight: "1.5",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                maxWidth: "100%"
+              }}>
+                📍 {center.full_address}
               </div>
-            ))}
+            )}
+          </div>
+          
+          {/* Distance Badge */}
+          <div style={{
+            background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+            color: "white",
+            padding: "12px 24px",
+            borderRadius: "30px",
+            fontWeight: 700,
+            fontSize: "1.1em",
+            whiteSpace: "nowrap",
+            boxShadow: "0 6px 16px rgba(245,87,108,0.3)",
+            flexShrink: 0,
+            minWidth: "100px",
+            textAlign: "center",
+            alignSelf: "center"
+          }}>
+            {typeof center.distance === 'number' ? center.distance.toFixed(2) : center.distance} km
           </div>
         </div>
-      )}
+      ))}
+    </div>
+  </div>
+)}
     </div>
   );
 }

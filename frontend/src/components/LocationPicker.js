@@ -26,7 +26,8 @@ function RecenterMap({ lat, lng }) {
 }
 
 function LocationPicker({ location, onLocationChange }) {
-  const [markerPos, setMarkerPos] = useState(location || { lat: 40.7128, lng: -74.006 });
+  // Default: KS Institute of Technology, Bangalore, Karnataka, India
+  const [markerPos, setMarkerPos] = useState(location || { lat: 12.9716, lng: 77.5946 });
 
   useEffect(() => {
     if (location) {

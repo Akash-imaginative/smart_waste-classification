@@ -21,13 +21,16 @@ function RecenterMap({ center }) {
   return null;
 }
 
-function MapWithAutocomplete({ onLocationChange, location }) {
+function MapWithAutocomplete({ onLocationChange, location, onConfirmLocation }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [tempLocation, setTempLocation] = useState(null);
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
   // Map marker position is controlled by location state
-  const markerPosition = location || { lat: 40.7128, lng: -74.006 };
+  // Default: KS Institute of Technology, Bangalore, Karnataka, India
+  const markerPosition = tempLocation || location || { lat: 12.9716, lng: 77.5946 };
 
   useEffect(() => {
     if (query.length < 3) {
@@ -42,7 +45,7 @@ function MapWithAutocomplete({ onLocationChange, location }) {
     async function fetchSuggestions() {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
         query
-      )}&addressdetails=1&limit=5`;
+      )}&addressdetails=1&limit=5&accept-language=en`;
       try {
         const res = await fetch(url, { signal: controller.signal });
         const data = await res.json();
@@ -65,12 +68,36 @@ function MapWithAutocomplete({ onLocationChange, location }) {
     const newPos = { lat: parseFloat(place.lat), lng: parseFloat(place.lon) };
     setQuery(place.display_name);
     setSuggestions([]);
-    onLocationChange(newPos);
+    setTempLocation(newPos);
+    setIsConfirmed(false);
   };
 
   const handleMarkerDrag = (e) => {
     const latlng = e.target.getLatLng();
-    onLocationChange(latlng);
+    setTempLocation(latlng);
+    setIsConfirmed(false);
+    
+    // Reverse geocode to update the search box (force English)
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&accept-language=en`)
+      .then(res => res.json())
+      .then(data => setQuery(data.display_name))
+      .catch(err => console.error(err));
+  };
+
+  const handleConfirmLocation = () => {
+    if (tempLocation) {
+      onConfirmLocation(tempLocation);
+      setIsConfirmed(true);
+    } else if (location) {
+      onConfirmLocation(location);
+      setIsConfirmed(true);
+    } else {
+      // Use default location
+      const defaultLoc = { lat: 12.9716, lng: 77.5946 };
+      setTempLocation(defaultLoc);
+      onConfirmLocation(defaultLoc);
+      setIsConfirmed(true);
+    }
   };
 
   return (
@@ -204,12 +231,64 @@ function MapWithAutocomplete({ onLocationChange, location }) {
         <Marker position={markerPosition} draggable eventHandlers={{ dragend: handleMarkerDrag }} />
       </MapContainer>
 
+      {/* Confirm Location Button */}
+      <div style={{ marginTop: "20px", textAlign: "center" }}>
+        <button
+          onClick={handleConfirmLocation}
+          disabled={isConfirmed}
+          style={{
+            padding: "16px 48px",
+            fontSize: "16px",
+            fontWeight: 700,
+            color: "white",
+            background: isConfirmed 
+              ? "linear-gradient(135deg, #52c41a 0%, #73d13d 100%)"
+              : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            border: "none",
+            borderRadius: "12px",
+            cursor: isConfirmed ? "not-allowed" : "pointer",
+            boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
+            transition: "all 0.3s ease",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "10px",
+            opacity: isConfirmed ? 0.8 : 1,
+          }}
+          onMouseOver={(e) => {
+            if (!isConfirmed) {
+              e.target.style.transform = "translateY(-2px)";
+              e.target.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.5)";
+            }
+          }}
+          onMouseOut={(e) => {
+            if (!isConfirmed) {
+              e.target.style.transform = "translateY(0)";
+              e.target.style.boxShadow = "0 4px 15px rgba(102, 126, 234, 0.4)";
+            }
+          }}
+        >
+          {isConfirmed ? (
+            <>
+              <span style={{ fontSize: "20px" }}>✓</span>
+              Location Confirmed
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: "20px" }}>📍</span>
+              Confirm Location & Find Centers
+            </>
+          )}
+        </button>
+      </div>
+
       {/* Instructions */}
       <div
         style={{
           marginTop: "16px",
           padding: "12px",
-          background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+          background: isConfirmed 
+            ? "linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)"
+            : "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
           borderRadius: "12px",
           fontSize: "13px",
           color: "#555",
@@ -217,7 +296,11 @@ function MapWithAutocomplete({ onLocationChange, location }) {
           fontStyle: "italic",
         }}
       >
-        💡 <strong>Tip:</strong> Search for a location or drag the marker to set your position
+        {isConfirmed ? (
+          <>✅ <strong>Location set!</strong> Searching for nearby recycling centers...</>
+        ) : (
+          <>💡 <strong>Tip:</strong> Search for a location or drag the marker, then click "Confirm Location"</>
+        )}
       </div>
     </div>
   );

@@ -1,0 +1,38 @@
+=== Epoch 29 Model Evaluation ===
+Model: models\checkpoints\highaccuracy_86.63_epoch29.keras
+Test Dir: data\test
+Overall Accuracy: 96.70%
+
+              precision    recall  f1-score   support
+
+     battery     0.9956    0.9956    0.9956       225
+  biological     0.9958    0.9792    0.9874       240
+ brown-glass     0.9908    0.9600    0.9752       225
+   cardboard     0.9774    0.9600    0.9686       225
+     clothes     0.9875    0.9875    0.9875       240
+ green-glass     1.0000    0.9911    0.9955       225
+       metal     0.9087    0.9542    0.9309       240
+       paper     0.9912    0.9956    0.9933       225
+     plastic     0.9163    0.8667    0.8908       240
+       shoes     0.9874    0.9792    0.9833       240
+       trash     0.9585    0.9625    0.9605       240
+ white-glass     0.9053    0.9778    0.9402       225
+
+    accuracy                         0.9670      2790
+   macro avg     0.9679    0.9674    0.9674      2790
+weighted avg     0.9676    0.9670    0.9671      2790
+
+
+Per-Class Accuracy:
+battery        : 99.56%
+biological     : 97.92%
+brown-glass    : 96.00%
+cardboard      : 96.00%
+clothes        : 98.75%
+green-glass    : 99.11%
+metal          : 95.42%
+paper          : 99.56%
+plastic        : 86.67%
+shoes          : 97.92%
+trash          : 96.25%
+white-glass    : 97.78%
