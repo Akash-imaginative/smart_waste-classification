@@ -11,7 +11,6 @@ from collections import Counter
 import requests
 from math import radians, cos, sin, asin, sqrt
 import time
-from functools import lru_cache
 
 # --- App setup ---
 app = Flask(__name__)
@@ -22,10 +21,8 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(ANNOTATED_FOLDER, exist_ok=True)
 
 # --- Model loading ---
-yolo_model = YOLO('yolov5s.pt')
-# Use the best model from evaluation (epoch 29 with 80.25% accuracy)
-model_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'checkpoints', 'highaccuracy_86.63_epoch29.keras')
-cnn_model = tf.keras.models.load_model(model_path)
+yolo_model = YOLO('yolo11s.pt')
+cnn_model = tf.keras.models.load_model("../models/checkpoints/highaccuracy_86.63_epoch29.keras")
 
 cnn_class_names = [
     'battery', 'biological', 'brown-glass', 'cardboard', 'clothes',
@@ -34,9 +31,7 @@ cnn_class_names = [
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB limit
 
-# --- Rate limiting for Nominatim API ---
-last_nominatim_request = 0
-NOMINATIM_RATE_LIMIT = 1.0  # 1 second between requests (Nominatim requirement)
+# --- Nominatim cache ---
 nominatim_cache = {}  # Cache for coordinates
 
 # --- Utilities ---
@@ -49,8 +44,6 @@ def preprocess_crop(crop_img):
 
 def annotate_image(image_path):
     image = cv2.imread(image_path)
-    if image is None or image.size == 0:
-        raise ValueError(f"Failed to load image from {image_path}")
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     h, w = image.shape[:2]
     
@@ -61,8 +54,7 @@ def annotate_image(image_path):
     
     # STEP 1: YOLO for distinct objects - COLLECT CROPS
     try:
-        # First pass: global detection with permissive thresholds to find more objects
-        results = yolo_model(rgb_image, conf=0.08, iou=0.45, max_det=300, verbose=False)
+        results = yolo_model(rgb_image, conf=0.35, iou=0.45, max_det=50, verbose=False)
         if results and results[0].boxes:
             yolo_boxes = results[0].boxes.xyxy.cpu().numpy()
             for box in yolo_boxes:
@@ -82,33 +74,6 @@ def annotate_image(image_path):
                     'bbox': (xmin, ymin, xmax, ymax),
                     'crop': crop
                 })
-
-        # Second pass: tiled inference to catch small/edge objects
-        tile_size = 640
-        stride = int(tile_size * 0.75)  # overlap tiles
-        for y0 in range(0, h, stride):
-            for x0 in range(0, w, stride):
-                y1 = min(h, y0 + tile_size)
-                x1 = min(w, x0 + tile_size)
-                tile = rgb_image[y0:y1, x0:x1]
-                if tile.size == 0:
-                    continue
-                t_results = yolo_model(tile, conf=0.08, iou=0.50, max_det=150, verbose=False)
-                if t_results and t_results[0].boxes:
-                    t_boxes = t_results[0].boxes.xyxy.cpu().numpy()
-                    for box in t_boxes:
-                        txmin, tymin, txmax, tymax = map(int, box)
-                        xmin, ymin = max(0, x0 + txmin), max(0, y0 + tymin)
-                        xmax, ymax = min(w, x0 + txmax), min(h, y0 + tymax)
-                        if (xmax - xmin) < 24 or (ymax - ymin) < 24:
-                            continue
-                        crop = image[ymin:ymax, xmin:xmax]
-                        if crop.size == 0:
-                            continue
-                        yolo_crops_data.append({
-                            'bbox': (xmin, ymin, xmax, ymax),
-                            'crop': crop
-                        })
     except Exception as e:
         print(f"YOLO detection failed: {e}")
     
@@ -127,29 +92,20 @@ def annotate_image(image_path):
             second_confidence = float(preds[top_2_indices[1]])
             confidence_margin = confidence - second_confidence
             
-            # Fix bias: Penalize problematic class predictions based on evaluation results
+            # Strict threshold: Skip battery (95%) and shoes/clothes (100%) unless highly confident
             predicted_label = cnn_class_names[pred_index]
+            if predicted_label == 'battery':
+                if confidence < 0.95:
+                    continue
+            elif predicted_label in ['shoes', 'clothes']:
+                if confidence < 0.999:
+                    continue
             
-            # Clothes: 0% F1-score in evaluation - be very skeptical
-            if predicted_label == 'clothes':
+            # Fix bias: Penalize shoes/clothes predictions that don't look like fabric
+            if predicted_label in ['shoes', 'clothes']:
                 gray_check = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
                 texture_std = np.std(gray_check)
-                hsv_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-                hsv_std = np.mean([np.std(hsv_crop[:,:,0]), np.std(hsv_crop[:,:,1]), np.std(hsv_crop[:,:,2])])
                 
-                if confidence < 0.95 or texture_std < 40 or hsv_std < 45:
-                    top_5_indices = np.argsort(preds)[-5:][::-1]
-                    for alt_idx in top_5_indices[1:]:
-                        alt_label = cnn_class_names[alt_idx]
-                        if alt_label != 'clothes' and preds[alt_idx] > 0.20:
-                            pred_index = alt_idx
-                            confidence = float(preds[alt_idx])
-                            break
-            
-            # Shoes: needs strong evidence
-            elif predicted_label == 'shoes':
-                gray_check = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-                texture_std = np.std(gray_check)
                 hsv_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
                 hsv_std = np.mean([np.std(hsv_crop[:,:,0]), np.std(hsv_crop[:,:,1]), np.std(hsv_crop[:,:,2])])
                 
@@ -157,22 +113,17 @@ def annotate_image(image_path):
                     top_3_indices = np.argsort(preds)[-3:][::-1]
                     for alt_idx in top_3_indices[1:]:
                         alt_label = cnn_class_names[alt_idx]
-                        if alt_label in ['plastic', 'metal', 'glass', 'brown-glass', 'green-glass', 'white-glass', 'trash'] and preds[alt_idx] > 0.30:
+                        alt_conf = float(preds[alt_idx])
+                        if alt_label in ['plastic', 'metal', 'glass', 'brown-glass', 'green-glass', 'white-glass'] and alt_conf > 0.25:
                             pred_index = alt_idx
-                            confidence = float(preds[alt_idx])
+                            confidence = alt_conf
+                            confidence_margin = confidence - float(preds[top_2_indices[1]] if top_2_indices[1] != alt_idx else preds[top_2_indices[0]])
                             break
             
-            # Final threshold check
-            final_label = cnn_class_names[pred_index]
-            if final_label == 'clothes' and confidence < 0.95:
-                final_label = 'trash'
-            elif final_label in ['shoes', 'metal'] and confidence < 0.85:
-                final_label = 'trash'
-            
-            if confidence >= 0.40 and confidence_margin >= 0.15:
+            if confidence >= 0.55 and confidence_margin >= 0.30:
                 all_detections.append({
                     'bbox': bbox,
-                    'label': final_label,
+                    'label': cnn_class_names[pred_index],
                     'confidence': confidence,
                     'source': 'yolo'
                 })
@@ -243,31 +194,17 @@ def annotate_image(image_path):
             second_confidence = float(preds[top_2_indices[1]])
             confidence_margin = confidence - second_confidence
             
-            # Fix bias: HEAVILY penalize clothes predictions (0% F1-score in evaluation)
+            # Strict threshold: Skip battery (95%) and shoes/clothes (100%) unless highly confident
             predicted_label = cnn_class_names[pred_index]
+            if predicted_label == 'battery':
+                if confidence < 0.95:
+                    continue
+            elif predicted_label in ['shoes', 'clothes']:
+                if confidence < 0.999:
+                    continue
             
-            if predicted_label == 'clothes':
-                # Clothes had 100% misclassification rate - be extremely skeptical
-                gray_check = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-                texture_std = np.std(gray_check)
-                
-                hsv_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-                hsv_std = np.mean([np.std(hsv_crop[:,:,0]), np.std(hsv_crop[:,:,1]), np.std(hsv_crop[:,:,2])])
-                
-                # Unless it has very strong fabric-like characteristics AND high confidence, switch to alternative
-                if confidence < 0.95 or texture_std < 40 or hsv_std < 45:
-                    top_5_indices = np.argsort(preds)[-5:][::-1]
-                    for alt_idx in top_5_indices[1:]:
-                        alt_label = cnn_class_names[alt_idx]
-                        alt_conf = float(preds[alt_idx])
-                        if alt_label != 'clothes' and alt_conf > 0.20:
-                            pred_index = alt_idx
-                            confidence = alt_conf
-                            confidence_margin = confidence - float(preds[top_5_indices[1]] if top_5_indices[1] != alt_idx else preds[top_5_indices[0]])
-                            break
-            
-            elif predicted_label == 'shoes':
-                # Similar logic for shoes
+            # Fix bias: Penalize shoes/clothes predictions for grid detections
+            if predicted_label in ['shoes', 'clothes']:
                 gray_check = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
                 texture_std = np.std(gray_check)
                 
@@ -279,38 +216,16 @@ def annotate_image(image_path):
                     for alt_idx in top_3_indices[1:]:
                         alt_label = cnn_class_names[alt_idx]
                         alt_conf = float(preds[alt_idx])
-                        if alt_label in ['plastic', 'metal', 'glass', 'brown-glass', 'green-glass', 'white-glass', 'trash'] and alt_conf > 0.35:
+                        if alt_label in ['plastic', 'metal', 'glass', 'brown-glass', 'green-glass', 'white-glass'] and alt_conf > 0.40:
                             pred_index = alt_idx
                             confidence = alt_conf
                             confidence_margin = confidence - float(preds[top_2_indices[1]] if top_2_indices[1] != alt_idx else preds[top_2_indices[0]])
                             break
             
-            # Apply VERY strict accuracy threshold for problematic classes
-            final_label = cnn_class_names[pred_index]
-            
-            # Based on evaluation: clothes had 0% F1-score, always confused with trash
-            # Paper had 3.92% F1-score, confused with cardboard and trash
-            if final_label == 'clothes':
-                if confidence < 0.95 or confidence_margin < 0.35:  # 95% confidence + strong margin
-                    # Check if it's actually trash or other material
-                    top_5_indices = np.argsort(preds)[-5:][::-1]
-                    for alt_idx in top_5_indices[1:]:
-                        alt_label = cnn_class_names[alt_idx]
-                        if alt_label != 'clothes' and preds[alt_idx] > 0.15:
-                            final_label = alt_label
-                            confidence = float(preds[alt_idx])
-                            break
-                    else:
-                        final_label = 'trash'  # Default to trash if no good alternative
-            
-            elif final_label in ['shoes', 'metal']:
-                if confidence < 0.85:  # 85% threshold for shoes/metal
-                    final_label = 'trash'  # Reclassify as trash if below threshold
-            
             if confidence >= 0.70 and confidence_margin >= 0.25:
                 all_detections.append({
                     'bbox': bbox,
-                    'label': final_label,
+                    'label': cnn_class_names[pred_index],
                     'confidence': confidence,
                     'source': 'grid'
                 })
@@ -432,107 +347,46 @@ def annotate_image(image_path):
         (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
         (conf_width, conf_height), conf_baseline = cv2.getTextSize(conf_text, font, font_scale - 0.2, thickness - 1)
         
+        # Determine label position - adjust to avoid overlap
+        label_y = ymin - 10
+        
+        # Check for overlap with existing labels and adjust
+        for existing_y, existing_xmin, existing_xmax in label_positions:
+            if abs(label_y - existing_y) < 40 and not (xmax < existing_xmin or xmin > existing_xmax):
+                # Overlap detected, move label higher
+                label_y = min(label_y, existing_y - 45)
+        
+        # Ensure label doesn't go above image
+        if label_y - text_height - 35 < 0:
+            label_y = ymax + text_height + 35
+        
+        label_positions.append((label_y, xmin, xmax))
+        
+        # Draw background rectangle for label with padding
         padding = 8
-        max_label_width = max(text_width, conf_width) + padding * 2
-        total_label_height = text_height + conf_height + baseline + padding * 2
+        bg_y1 = max(0, label_y - text_height - baseline - padding)
+        bg_y2 = min(h, label_y + conf_height + padding)
+        bg_x2 = min(w, xmin + max(text_width, conf_width) + padding * 2)
         
-        # Helper function to check if two rectangles overlap
-        def rectangles_overlap(x1, y1, w1, h1, x2, y2, w2, h2):
-            return not (x1 + w1 < x2 or x2 + w2 < x1 or y1 + h1 < y2 or y2 + h2 < y1)
-        
-        # Try multiple positions to avoid overlaps
-        positions_to_try = [
-            (xmin, ymin - total_label_height - 10, 'above'),           # Above box
-            (xmin, ymax + 5, 'below'),                                  # Below box
-            (xmax + 5, ymin, 'right'),                                  # Right of box
-            (max(0, xmin - max_label_width - 5), ymin, 'left'),        # Left of box
-            (xmin, ymin + 5, 'inside_top'),                            # Inside box top
-            (xmin, ymax - total_label_height - 5, 'inside_bottom'),    # Inside box bottom
-        ]
-        
-        label_x, label_y = xmin, ymin - total_label_height - 10
-        best_position = None
-        
-        for try_x, try_y, position_type in positions_to_try:
-            # Calculate candidate label bounds
-            candidate_y1 = try_y
-            candidate_y2 = try_y + total_label_height
-            candidate_x1 = try_x
-            candidate_x2 = try_x + max_label_width
-            
-            # Ensure within image bounds
-            if candidate_y1 < 0 or candidate_y2 > h or candidate_x1 < 0 or candidate_x2 > w:
-                continue
-            
-            # Check for overlaps with existing labels
-            has_overlap = False
-            for (ex1, ey1, ex2, ey2) in label_positions:
-                if rectangles_overlap(candidate_x1, candidate_y1, max_label_width, total_label_height,
-                                     ex1, ey1, ex2 - ex1, ey2 - ey1):
-                    has_overlap = True
-                    break
-            
-            # Found a position without overlap
-            if not has_overlap:
-                label_x = try_x
-                label_y = try_y + text_height + baseline + padding  # Adjust for text baseline
-                best_position = position_type
-                break
-        
-        # If no non-overlapping position found, use original with slight offset
-        if best_position is None:
-            label_x = xmin
-            label_y = ymin - 10
-            # Shift down if overlaps exist
-            for (ex1, ey1, ex2, ey2) in label_positions:
-                if rectangles_overlap(xmin, ymin - total_label_height - 10, max_label_width, total_label_height,
-                                     ex1, ey1, ex2 - ex1, ey2 - ey1):
-                    label_y = ey2 + text_height + 5
-        
-        # Final boundary check
-        if label_x + max_label_width > w:
-            label_x = max(0, w - max_label_width - 5)
-        if label_y - text_height - baseline - padding < 0:
-            label_y = text_height + baseline + padding + 5
-        if label_y + conf_height + padding > h:
-            label_y = h - conf_height - padding - 5
-        
-        # Calculate background rectangle bounds
-        bg_y1 = label_y - text_height - baseline - padding
-        bg_y2 = label_y + conf_height + padding
-        bg_x1 = label_x
-        bg_x2 = label_x + max_label_width
-        
-        # Store label position for future collision detection (before clamping)
-        label_positions.append((bg_x1, bg_y1, bg_x2, bg_y2))
-        
-        # Clamp to image boundaries
-        bg_y1 = max(0, bg_y1)
-        bg_y2 = min(h, bg_y2)
-        bg_x1 = max(0, bg_x1)
-        bg_x2 = min(w, bg_x2)
-        
-        # Ensure label coordinates are within bounds and valid
-        if bg_y2 <= bg_y1 or bg_x2 <= bg_x1:
+        # Ensure label coordinates are within bounds
+        if bg_y1 < 0 or bg_y2 > h or bg_x2 > w or xmin < 0:
+            # Skip label if it would be out of bounds
             continue
         
         # Draw semi-transparent background
         overlay = image.copy()
-        cv2.rectangle(overlay, (bg_x1, bg_y1), (bg_x2, bg_y2), (0, 0, 0), -1)
+        cv2.rectangle(overlay, (xmin, bg_y1), (bg_x2, bg_y2), (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
         
         # Draw colored border around label
-        cv2.rectangle(image, (bg_x1, bg_y1), (bg_x2, bg_y2), (0, 255, 0), 2)
+        cv2.rectangle(image, (xmin, bg_y1), (bg_x2, bg_y2), (0, 255, 0), 2)
         
-        # Draw text (class name in white, bold) - ensure text position is within bounds
-        text_x = max(bg_x1 + padding, 0)
-        text_y = max(label_y - baseline - 5, text_height)
-        cv2.putText(image, text, (text_x, text_y),
+        # Draw text (class name in white, bold)
+        cv2.putText(image, text, (xmin + padding, label_y - baseline - 5),
                    font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
         
         # Draw confidence (in light green, smaller)
-        conf_y = min(label_y + conf_height + 5, h - 5)
-        cv2.putText(image, conf_text, (text_x, conf_y),
+        cv2.putText(image, conf_text, (xmin + padding, label_y + conf_height + 5),
                    font, font_scale - 0.2, (144, 238, 144), thickness - 1, cv2.LINE_AA)
 
     annotated_image_path = os.path.join(ANNOTATED_FOLDER, os.path.basename(image_path))
@@ -567,12 +421,12 @@ def generate_fallback_centers(lat, lng):
         center_lat = lat + lat_offset + random.uniform(-0.005, 0.005)
         center_lng = lng + lng_offset + random.uniform(-0.005, 0.005)
         
-        # Calculate approximate distance with safe math
+        # Calculate approximate distance
         from math import radians, cos, sin, asin, sqrt
         dlon = radians(center_lng - lng)
         dlat = radians(center_lat - lat)
         a = sin(dlat/2)**2 + cos(radians(lat)) * cos(radians(center_lat)) * sin(dlon/2)**2
-        c = 2 * asin(sqrt(min(1.0, a)))  # Clamp to avoid domain error
+        c = 2 * asin(sqrt(a))
         distance = round(c * 6371, 2)  # km
         
         centers.append({
@@ -616,13 +470,6 @@ def query_osm_recycling_centers(lat, lng, radius=15000, max_results=5):
             return generate_fallback_centers(lat, lng)
         
         centers = []
-        # Blacklist of closed/invalid shops
-        blacklisted_names = [
-            'mahesh paper mart',
-            'mahesh paper',
-            'paper mart'
-        ]
-        
         for elem in elements:
             tags = elem.get('tags', {})
             if not tags:
@@ -633,11 +480,6 @@ def query_osm_recycling_centers(lat, lng, radius=15000, max_results=5):
                         tags.get('operator') or 
                         tags.get('amenity', 'Recycling').replace('_', ' ').title())
             
-            # Filter out blacklisted names
-            if any(blacklisted.lower() in base_name.lower() for blacklisted in blacklisted_names):
-                print(f"🚫 Filtered out blacklisted center: {base_name}")
-                continue
-            
             # Coordinates
             if 'lat' in elem and 'lon' in elem:
                 center_lat, center_lng = elem['lat'], elem['lon']
@@ -646,11 +488,14 @@ def query_osm_recycling_centers(lat, lng, radius=15000, max_results=5):
             else:
                 continue
             
-            # 🔥 IMPROVED NOMINATIM: Rate-limited, cached, with retry logic
+            # 🆕 FIXED NOMINATIM: Get NEIGHBORHOOD with proper headers and rate limiting
             area_name = 'Local Area'
             full_address = 'Address not available'
             
             try:
+                # Declare global variable
+                global nominatim_cache
+                
                 # Check cache first
                 cache_key = f"{center_lat:.6f},{center_lng:.6f}"
                 if cache_key in nominatim_cache:
@@ -659,14 +504,6 @@ def query_osm_recycling_centers(lat, lng, radius=15000, max_results=5):
                     full_address = cached['full_address']
                     print(f"📦 Using cached address for {cache_key}")
                 else:
-                    # Rate limiting: wait if needed
-                    global last_nominatim_request
-                    time_since_last = time.time() - last_nominatim_request
-                    if time_since_last < NOMINATIM_RATE_LIMIT:
-                        sleep_time = NOMINATIM_RATE_LIMIT - time_since_last
-                        print(f"⏳ Rate limiting: sleeping {sleep_time:.2f}s")
-                        time.sleep(sleep_time)
-                    
                     nominatim_url = "https://nominatim.openstreetmap.org/reverse"
                     nominatim_headers = {
                         'User-Agent': 'WasteClassificationApp/1.0 (educational-project)'
@@ -680,69 +517,44 @@ def query_osm_recycling_centers(lat, lng, radius=15000, max_results=5):
                         'accept-language': 'en'
                     }
                     
-                    # Retry logic with exponential backoff
-                    max_retries = 3
-                    for attempt in range(max_retries):
-                        try:
-                            last_nominatim_request = time.time()
-                            nom_resp = requests.get(
-                                nominatim_url, 
-                                headers=nominatim_headers, 
-                                params=nominatim_params, 
-                                timeout=10
-                            )
-                            
-                            if nom_resp.status_code == 200:
-                                area_data = nom_resp.json()
-                                full_address = area_data.get('display_name', 'Address not available')
-                                
-                                addr = area_data.get('address', {})
-                                
-                                # 🎯 IMPROVED: More comprehensive location extraction
-                                area_parts = []
-                                
-                                # Try multiple location fields in priority order
-                                location_fields = [
-                                    'neighbourhood', 'suburb', 'quarter', 'city_district',
-                                    'district', 'borough', 'road', 'hamlet', 'village',
-                                    'town', 'city', 'municipality'
-                                ]
-                                
-                                for field in location_fields:
-                                    if addr.get(field):
-                                        area_parts.append(addr[field])
-                                        break  # Use first available
-                                
-                                area_name = area_parts[0] if area_parts else 'Local Area'
-                                
-                                # Cache the result
-                                nominatim_cache[cache_key] = {
-                                    'area_name': area_name,
-                                    'full_address': full_address
-                                }
-                                print(f"✅ Nominatim success for {cache_key}: {area_name}")
-                                break  # Success, exit retry loop
-                                
-                            elif nom_resp.status_code == 429:  # Too Many Requests
-                                wait_time = 2 ** attempt  # Exponential backoff
-                                print(f"⚠️ Rate limited (429), waiting {wait_time}s before retry {attempt+1}/{max_retries}")
-                                time.sleep(wait_time)
-                            else:
-                                print(f"⚠️ Nominatim returned {nom_resp.status_code}, attempt {attempt+1}/{max_retries}")
-                                if attempt < max_retries - 1:
-                                    time.sleep(1)
-                                    
-                        except requests.exceptions.Timeout:
-                            print(f"⏱️ Nominatim timeout, attempt {attempt+1}/{max_retries}")
-                            if attempt < max_retries - 1:
-                                time.sleep(1)
-                        except requests.exceptions.RequestException as req_err:
-                            print(f"🌐 Nominatim request error: {req_err}, attempt {attempt+1}/{max_retries}")
-                            if attempt < max_retries - 1:
-                                time.sleep(1)
-                                
+                    nom_resp = requests.get(nominatim_url, headers=nominatim_headers, params=nominatim_params, timeout=8)
+                    print(f"🔍 Nominatim status for {center_lat},{center_lng}: {nom_resp.status_code}")
+                    
+                    if nom_resp.status_code == 200:
+                        area_data = nom_resp.json()
+                        full_address = area_data.get('display_name', 'Address not available')
+                        print(f"🔍 Nominatim response: {area_data.get('display_name', 'No display_name')}")
+                        
+                        addr = area_data.get('address', {})
+                        
+                        # 🆕 PRIORITIZE: neighbourhood > suburb > city_district > road > city
+                        area_parts = []
+                        location_fields = [
+                            'neighbourhood', 'suburb', 'quarter', 'city_district',
+                            'district', 'borough', 'road', 'hamlet', 'village',
+                            'town', 'city', 'municipality'
+                        ]
+                        
+                        for field in location_fields:
+                            if addr.get(field):
+                                area_parts.append(addr[field])
+                                break
+                        
+                        area_name = area_parts[0] if area_parts else 'Local Area'
+                        
+                        # Cache the result
+                        nominatim_cache[cache_key] = {
+                            'area_name': area_name,
+                            'full_address': full_address
+                        }
+                        print(f"✅ Nominatim success for {cache_key}: {area_name}")
+                    else:
+                        print(f"❌ Nominatim failed: {nom_resp.status_code}")
+                        area_name = 'Local Area'
+                        full_address = 'Address not available'
+                    
             except Exception as nom_err:
-                print(f"❌ Nominatim outer error: {nom_err}")
+                print(f"❌ Nominatim error: {nom_err}")
                 area_name = 'Local Area'
                 full_address = 'Address not available'
             
@@ -757,38 +569,17 @@ def query_osm_recycling_centers(lat, lng, radius=15000, max_results=5):
                 "lng": center_lng
             })
         
-        # Calculate distances with improved accuracy
+        # Calculate distances + deduplicate + sort (same as before)
         def haversine(lat1, lon1, lat2, lon2):
-            """
-            Calculate the great circle distance between two points 
-            on the earth (specified in decimal degrees)
-            Returns distance in kilometers with high precision
-            """
-            from math import radians, cos, sin, asin, sqrt, atan2
-            
-            # Convert to radians
-            lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
-            
-            # Haversine formula with improved precision
-            dlon = lon2 - lon1
-            dlat = lat2 - lat1
-            
-            a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-            
-            # Clamp 'a' to avoid floating-point errors with asin
-            a = max(0, min(1, a))
-            
-            c = 2 * atan2(sqrt(a), sqrt(1-a))  # More accurate than asin
-            
-            # Earth's radius in km (mean radius)
-            R = 6371.0088
-            
-            return R * c
+            from math import radians, cos, sin, asin, sqrt
+            dlon = radians(lon2 - lon1)
+            dlat = radians(lat2 - lat1)
+            a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+            c = 2 * asin(sqrt(a))
+            return c * 6371
         
-        # Calculate distances with 3 decimal precision for accuracy
         for center in centers:
-            distance_km = haversine(lat, lng, center["lat"], center["lng"])
-            center["distance"] = round(distance_km, 3)  # 3 decimal places for meter precision
+            center["distance"] = round(haversine(lat, lng, center["lat"], center["lng"]), 2)
         
         seen_coords = set()
         unique_centers = []
@@ -805,6 +596,8 @@ def query_osm_recycling_centers(lat, lng, radius=15000, max_results=5):
         print(f"❌ OSM Error: {e}")
         return generate_fallback_centers(lat, lng)
 
+
+# --- API endpoints ---
 
 # --- API endpoints ---
 @app.route('/api/find-centers', methods=['POST'])
@@ -834,21 +627,11 @@ def infer():
     file = request.files['image']
     if file.filename == '':
         return jsonify({'error': 'No image selected'}), 400
-    
-    # Validate image file extension
-    allowed_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'}
-    file_ext = os.path.splitext(file.filename)[1].lower()
-    if file_ext not in allowed_extensions:
-        return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
-    
     filename = secure_filename(file.filename)
     save_path = os.path.join(UPLOAD_FOLDER, filename)
     file.save(save_path)
-    
     try:
         annotated_path, classifications, composition = annotate_image(save_path)
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': f'Failed during annotation: {str(e)}'}), 500
 

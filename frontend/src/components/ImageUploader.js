@@ -145,7 +145,7 @@ function ImageUploader({ onResults, location, onImageSelect }) {
           fontSize: '1.4em',
           letterSpacing: '-0.025em'
         }}>
-          {isDragging ? 'Drop your image here!' : 'Upload Waste Image'}
+          {isDragging ? 'Drop your image here!' : 'Upload an image'}
         </h3>
         
         <p style={{
@@ -253,6 +253,7 @@ function ImageUploader({ onResults, location, onImageSelect }) {
               </>
             ) : (
               <>
+                <span>🚀</span>
                 Classify Waste
               </>
             )}
@@ -297,7 +298,7 @@ function ImageUploader({ onResults, location, onImageSelect }) {
             fontSize: '1.1em',
             marginBottom: '6px'
           }}>
-            Analyzing your waste image...
+            Analyzing your image...
           </p>
           <p style={{ color: '#718096', fontSize: '0.9em' }}>This may take a few moments</p>
         </div>
@@ -366,7 +367,7 @@ function ImageUploader({ onResults, location, onImageSelect }) {
                 alignItems: 'center',
                 gap: '8px'
               }}>
-                	Result
+                <span>✨</span> Classified Result
               </h4>
               <div style={{
                 background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',

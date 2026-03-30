@@ -1,0 +1,23 @@
+# Dataset configuration for YOLO validation
+path: .  # Root directory (relative to this file)
+train: data/train  # Training images directory
+val: data/val      # Validation images directory
+test: data/test    # Test images directory (optional)
+
+# Number of classes
+nc: 12
+
+# Class names (waste categories)
+names:
+  0: battery
+  1: biological
+  2: brown-glass
+  3: cardboard
+  4: clothes
+  5: green-glass
+  6: metal
+  7: paper
+  8: plastic
+  9: shoes
+  10: trash
+  11: white-glass
